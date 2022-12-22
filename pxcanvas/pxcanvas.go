@@ -13,7 +13,6 @@ import (
 
 type PxCanvasMouseState struct {
 	previousCoord *fyne.PointEvent
-	// hovering      bool
 }
 
 type PxCanvas struct {
@@ -86,7 +85,55 @@ func (pxCanvas *PxCanvas) CreateRenderer() fyne.WidgetRenderer {
 }
 
 func (pxCanvas *PxCanvas) TryPan(previousCoord *fyne.PointEvent, ev *desktop.MouseEvent) {
-	if previousCoord != nil && ev.Button == desktop.MouseButtonPrimary {
+	x, y := pxCanvas.MouseToCanvasXY(ev)
+	if previousCoord != nil && ev.Button == desktop.MouseButtonSecondary && x != nil && y != nil {
 		pxCanvas.Pan(*previousCoord, ev.PointEvent)
 	}
+}
+
+// Brushable interface
+func (pxCanvas *PxCanvas) SetColor(c color.Color, x, y int) {
+	if nrgba, ok := pxCanvas.PixelData.(*image.NRGBA); ok {
+		nrgba.Set(x, y, c)
+	}
+
+	if rgba, ok := pxCanvas.PixelData.(*image.RGBA); ok {
+		rgba.Set(x, y, c)
+	}
+	pxCanvas.Refresh()
+}
+
+func (pxCanvas *PxCanvas) MouseToCanvasXY(ev *desktop.MouseEvent) (*int, *int) {
+	bounds := pxCanvas.Bounds()
+	if !InBounds(ev.Position, bounds) {
+		return nil, nil
+	}
+
+	pxSize := float32(pxCanvas.PxSize)
+	xOffset := pxCanvas.CanvasOffset.X
+	yOffset := pxCanvas.CanvasOffset.Y
+
+	x := int((ev.Position.X - xOffset) / pxSize)
+	y := int((ev.Position.Y - yOffset) / pxSize)
+
+	return &x, &y
+}
+
+func (pxCanvas *PxCanvas) LoadImage(img image.Image) {
+	dimensions := img.Bounds()
+
+	pxCanvas.PxCanvasConfig.PxCols = dimensions.Dx()
+	pxCanvas.PxCanvasConfig.PxRows = dimensions.Dy()
+
+	pxCanvas.PixelData = img
+	pxCanvas.reloadImage = true
+	pxCanvas.Refresh()
+}
+
+func (pxCanvas *PxCanvas) NewDrawing(cols, rows int) {
+	pxCanvas.appState.SetFilePath("")
+	pxCanvas.PxCols = cols
+	pxCanvas.PxRows = rows
+	pixelData := NewBlankImage(cols, rows, color.NRGBA{128, 128, 128, 255})
+	pxCanvas.LoadImage(pixelData)
 }
